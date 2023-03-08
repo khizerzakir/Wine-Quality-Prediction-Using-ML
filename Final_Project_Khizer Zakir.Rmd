@@ -1,0 +1,450 @@
+---
+title: "Introduction to Machine Learning and Data Science"
+subtitle: "Prediction of Wine Quality"
+author: "Khizer"
+date: "2023-03-01"
+output:
+  html_document:
+    toc: true
+    number sections: true
+    toc_float: true
+    theme: cosmo
+    highlight: textmate
+---
+
+```{r setup, include=FALSE, echo=FALSE, results='asis',message=FALSE, warning=FALSE, fig.show='animate'}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Introduction
+
+For years, wine quality has been determined by the experts at special festivals, compeitions, and events. We are no expert in wine tasting or determing the quality of the wine, how can we differentiate the wine according to their quality?
+According to experts, the wine is differentiated according to its smell, flavor, and color, but we are not a wine expert to say that wine is good or bad. What will we do then? Just like any other data-driven decision making, we can make decision or predict the quality of wine using lots of data. Data that has been reported by the experts. 
+The wine quality data from the UCI Machine Learning Repository includes the chemical properties of 'red' and 'white' wine along with their quality ranging from 0-10. We can train the models using machine learning to understand the distribution and relationship of and between the chemical properties and the quality of wine.
+
+## Description of Dataset
+To get a better understanding of the variables:
+
+    •	volatile acidity :   Volatile acidity is the gaseous acids present in wine.
+    •	fixed acidity :   Primary fixed acids found in wine are tartaric, succinic, citric, and malic
+    •	residual sugar :   Amount of sugar left after fermentation.
+    •	citric acid :    It is weak organic acid, found in citrus fruits naturally.
+    •	chlorides :   Amount of salt present in wine.
+    •	free sulfur dioxide :   So2 is used for prevention of wine by oxidation and microbial spoilage.
+    •	total sulfur dioxide:   Total content of Sulfur dioxide chemical.
+    •	pH :   In wine pH is used for checking acidity
+    •	density :   Density of the wine(s).
+    •	sulphates :    Added sulfites preserve freshness and protect wine from oxidation, and bacteria.
+    •	alcohol :   Percent of alcohol present in wine.
+    •	quality :   Quality of the wine ranging from 0-10.
+    
+
+This project will guide you through a step-by-step process to use machine learning for the prediction of wine quality using just the chemical properties of wine without a human tasting it. 
+
+### Let's rock and roll!
+
+## Target of this Project
+
+In this project, I will analyze the "Wine Data - Red & White" from UCI Machine Learning Repository and using EDA, I will try to understand which variables are responsible for the quality of the wine using. First, I will understand the data and the class distributions of wine qaulity and the respective chemical propertites of wines. Finally, I will implement a simple linear model and randomForest to predict the outcome.
+
+
+# Data Preparation
+
+In this section, I will mainly analyse the data set, summarize it, and get familiarize myself with the data. 
+
+Note that you may need to run the install.packages() commands only once to install the packages on your system, while the library() commands need to be run each time you start a new R session.
+If we have missed any packages or libraries here, they will come in the later sections.
+
+```{r message = FALSE}
+#Load all the required libraries
+#Load all the required packages
+# The packages are in hash tags because it might cause trouble while preparing the markdown document
+#install.packages("ggplot2")
+#install.packages("dplyr")
+#install.packages("gridExtra")
+#install.packages("GGally")
+#install.packages("memisc")
+#install.packages("pander")
+#install.packages("corrplot")
+
+library("ggplot2")
+library("dplyr")
+library("gridExtra")
+library("GGally")
+library("memisc")
+library("pander")
+library("corrplot")
+library("readr")
+library("tidyverse")
+```
+
+## Load the Data
+
+```{r}
+#Set the working directory
+#If you are logged in from a different system just setwd() first to load the data without the need to mention path everywhere
+
+setwd("C:\\Users\\John\\Desktop\\ERASMUS\\Salzburg_Semester1\\Courses\\Data Science and Machine Learning\\Final")
+
+#Loading the csv file(s)
+
+red<-read.csv("winequality-red.csv")
+white<-read.csv("winequality-white.csv")
+red$wine.type<-"red"
+white$wine.type<-"white"
+library(dplyr)
+library(tidyverse)
+library(caret)
+wine<-rbind(red,white)
+
+# Checking for NA entries
+
+wine %>% is.na() %>% colSums()
+
+# Create a new column called "quality_rating" that determines whether the wine should be poured in the glass or in the sink
+
+wine$quality_rating <- ifelse(wine$quality > 6, "good", "bad")
+wine$quality_rating <- as.factor(wine$quality_rating)
+
+# summary of the "wine" data
+
+knitr::kable(str(wine), caption = "Structure and Description of the data")
+knitr::kable(summary(wine),caption = "Summary Statistics the data")
+
+# Summary for the quality column
+
+summary(wine$quality)
+table(wine$quality)
+
+# Histograms
+
+ggplot(data = wine) + 
+  geom_bar(aes(wine$wine.type, fill = wine$wine.type)) +
+  labs(title = "Prevalence of red and white wines",
+       caption = "Source: train_set dataset.") +
+  theme(legend.position = 'none')
+
+# For quality
+
+ggplot(data = wine) + 
+  geom_bar(aes(quality, fill = quality)) +
+  labs(title = "Prevalence of red and white wines",
+       caption = "Source: train_set dataset.") +
+  theme(legend.position = 'none')
+```
+
+# Summary of the Data (EDA)
+
+This step is to explore the dataset and find the most fitting variables for the model(s) in the later section.
+
+## Test and Train 
+
+Before performing the EDA, we must split the data into test set and training set. Although this step can be completed later, we are splitting the data at this step to perform EDA only on the training set. The training set will help machine learn about the parameters and variables that influence the quality of the wine
+
+```{r warning=FALSE, message=FALSE}
+# Making training and testing data sets
+
+set.seed(3000, sample.kind = "Rounding")
+test_index <- createDataPartition(y = wine$quality, 
+                                  times = 1, 
+                                  p = 0.3, 
+                                  list = FALSE)
+# Train and test sets for wine type
+train_set <- wine[-test_index,]
+test_set  <- wine[test_index,]
+```
+
+## Summary of the wine - training data
+
+All the EDA will be done on the training data to understand the influence of chemical properties. This section will help us understand the variables that affect the quality of the wine, at the most and at the least. 
+
+```{r warning=FALSE, message=FALSE}
+library(tidyverse)
+# Structure and Description of the data
+knitr::kable(str(train_set),caption = "Structure and Description of the training data")
+# Summary of the training dataset
+knitr::kable(summary(train_set),caption = "Summary Statistics of the training data")
+
+# Summary to know the distribution of wine as "Good" and "Bad"
+knitr::kable(summary(train_set$quality_rating),caption = "Summary of Quality Rating")
+
+# Histogram for quality distribution in the training set
+
+ggplot(train_set, aes(x = quality)) +
+  geom_histogram(fill = "blue", bins = 20) +
+  labs(title = "Histogram of Wine Quality",
+       x = "Quality", y = "Count") +
+  theme_minimal()
+
+library(corrgram)
+library(corrplot)
+
+# Correlation Table
+knitr::kable(cor(train_set[,-c(13,14)]))
+
+# Corrogram
+  
+corrgram(train_set[,-c(13,14)], order=TRUE, 
+         lower.panel = panel.shade, 
+         upper.panel = panel.cor, 
+         text.panel  = panel.txt,
+         main = "Correlogram: chemical Properties of Wine",
+         col.regions=colorRampPalette(c("darkgoldenrod4", "burlywood1",
+                                        "darkkhaki", "darkgreen")))
+# This function will help you identify the most important properties that has a stronger influence on the quality of the wine
+
+knitr::kable(filterVarImp(x=train_set[,-c(12,13,14)],
+                          y=train_set$quality))
+```
+It is evident from this table and the corrogram that the following variables have stronger influence on the quality of the wine compare to rest of them:
+  - Fixed Acidity
+  - Volatile Acidity
+  - Chlorides
+  - Density
+  - Alcohol
+
+These variables will come handy when preparing the model in the later section. 
+
+## Data visualization based on wine type
+
+The following graphics are part of the data exploration step. This gives you an opportunity to understand the data well and build a stronger model. 
+
+```{r }
+# Build the plots based on wine type
+p1<-ggplot(train_set) + 
+  geom_density(aes_string(x = train_set$fixed.acidity, fill = "wine.type"), alpha = 0.5) +
+  ggtitle("Fixed Acidity")
+p2<-ggplot(train_set) + 
+  geom_density(aes_string(x = train_set$volatile.acidity, fill = "wine.type"), alpha = 0.5) +
+  ggtitle("Volatile Acidity")
+p3<-ggplot(train_set) + 
+  geom_density(aes_string(x = train_set$residual.sugar, fill = "wine.type"), alpha = 0.5) +
+  ggtitle("Residual Sugar")
+p4<-ggplot(train_set) + 
+  geom_density(aes_string(x = train_set$citric.acid, fill = "wine.type"), alpha = 0.5) +
+  ggtitle("Citric Acid")
+p5<-ggplot(train_set) + 
+  geom_density(aes_string(x = train_set$chlorides, fill = "wine.type"), alpha = 0.5) +
+  ggtitle("Chlorides")
+p6<-ggplot(train_set) + 
+  geom_density(aes_string(x = train_set$free.sulfur.dioxide, fill = "wine.type"), alpha = 0.5) +
+  ggtitle("Free Sulfur Dioxide")
+p7<-ggplot(train_set) + 
+  geom_density(aes_string(x = train_set$total.sulfur.dioxide, fill = "wine.type"), alpha = 0.5) +
+  ggtitle("Total Sulfur Dioxide")
+p8<-ggplot(train_set) + 
+  geom_density(aes_string(x = train_set$density, fill = "wine.type"), alpha = 0.5) +
+  ggtitle("Density")
+p9<-ggplot(train_set) + 
+  geom_density(aes_string(x = train_set$pH, fill = "wine.type"), alpha = 0.5) +
+  ggtitle("pH")
+p10<-ggplot(train_set) + 
+  geom_density(aes_string(x = train_set$sulphates, fill = "wine.type"), alpha = 0.5) +
+  ggtitle("Sulphates")
+p11<-ggplot(train_set) + 
+  geom_density(aes_string(x = train_set$alcohol, fill = "wine.type"), alpha = 0.5) +
+  ggtitle("Alcohol")
+
+# Arrange the ggplots into a grid
+grid.arrange(p1, p2,p3,p4,p5,p6,p7,p8,p9,p10,p11, nrow = 4, ncol=3)
+```
+
+
+## Data visualization based on the quality rating
+
+The reason behind choosing the quality_rating instead of the continuous variable of quality is to avoid chaos in the graphs. The quality_rating will help generate smoother graphs. 
+
+```{r }
+# Build the plots based on quality rating
+pp1<-ggplot(train_set) + 
+  geom_density(aes_string(x = train_set$fixed.acidity, fill = "quality_rating"), alpha = 0.5) +
+  ggtitle("Fixed Acidity")
+pp2<-ggplot(train_set) + 
+  geom_density(aes_string(x = train_set$volatile.acidity, fill = "quality_rating"), alpha = 0.5) +
+  ggtitle("Volatile Acidity")
+pp3<-ggplot(train_set) + 
+  geom_density(aes_string(x = train_set$residual.sugar, fill = "quality_rating"), alpha = 0.5) +
+  ggtitle("Residual Sugar")
+pp4<-ggplot(train_set) + 
+  geom_density(aes_string(x = train_set$citric.acid, fill = "quality_rating"), alpha = 0.5) +
+  ggtitle("Citric Acid")
+pp5<-ggplot(train_set) + 
+  geom_density(aes_string(x = train_set$chlorides, fill = "quality_rating"), alpha = 0.5) +
+  ggtitle("Chlorides")
+pp6<-ggplot(train_set) + 
+  geom_density(aes_string(x = train_set$free.sulfur.dioxide, fill = "quality_rating"), alpha = 0.5) +
+  ggtitle("Free Sulfur Dioxide")
+pp7<-ggplot(train_set) + 
+  geom_density(aes_string(x = train_set$total.sulfur.dioxide, fill = "quality_rating"), alpha = 0.5) +
+  ggtitle("Total Sulfur Dioxide")
+pp8<-ggplot(train_set) + 
+  geom_density(aes_string(x = train_set$density, fill = "quality_rating"), alpha = 0.5) +
+  ggtitle("Density")
+pp9<-ggplot(train_set) + 
+  geom_density(aes_string(x = train_set$pH, fill = "quality_rating"), alpha = 0.5) +
+  ggtitle("pH")
+pp10<-ggplot(train_set) + 
+  geom_density(aes_string(x = train_set$sulphates, fill = "quality_rating"), alpha = 0.5) +
+  ggtitle("Sulphates")
+pp11<-ggplot(train_set) + 
+  geom_density(aes_string(x = train_set$alcohol, fill = "quality_rating"), alpha = 0.5) +
+  ggtitle("Alcohol")
+
+# Arrange the ggplots into a grid
+grid.arrange(pp1, pp2,pp3,pp4,pp5,pp6,pp7,pp8,pp9,pp10,pp11, nrow = 4, ncol = 3)
+```
+
+## Scatter plot Matrix
+
+This section strengthens the earlier observation regarding the top 5 influential variables that impacts the wine quality.
+
+```{r warning=FALSE, message=FALSE}
+new_data<-train_set[,-c(13,14)]
+library(ggcorrplot)
+ggcorrplot(new_data %>% cor(),
+           hc.order = TRUE, type = "lower",
+           lab = TRUE,
+           digits = 1,
+           ggtheme = ggplot2::theme_dark(),)
+library(PerformanceAnalytics)
+chart.Correlation(new_data, hist = T)
+
+```
+
+The preceding figure (Chart Correlation) tells many things. But, in general, it shows four points: scatter plots between each variable, histograms of each variable, correlation values between each value, and p-values between each value against significance value of 0.05.
+
+## Correlation Values
+
+The figure above shows that below relationships have a strong correlation.
+
+    Between density and fixed.acidity (0.67)
+    Between fixed.acidity and volatile.acidity (0.67)
+    Between fixed.acidity and pH (-0.68)
+    Between chlorides and alcohol (0.67)
+    
+Those perhaps indicate sufficiently high multicollinearity.
+
+## P-values
+
+In addition, it is only volatile.acidity and alcohol which have the largest correlation value with quality.As seen in the figure above, the red stars in the upper triangle of the matrix indicate the significance. The more the stars exist, the more significant the relationship is. In order to be significant enough to the significance value (we use significance value (alpha) of 0.05), we need at least one star.
+
+In this p-value analysis, we’re only interested in considering the p-values of relationship between quality and each predictor variable. We can see that all variables have at least one star (meaning p-value less than pre-determined alpha (i.e. 0.05)), except residual.sugar. So, we won’t consider such variable any longer.
+
+# Prediction Problem & Creating Models
+
+### Target Problem 
+
+"Based on all the data about the chemical properties, I want to predict if a wine should be poured in the glass (Good quality) or it must be poured in the sink (Very bad quality)"
+
+The quality factors, test data and the training data has been worked out earlier in this project, which means, in this step we are more concerned about training the model only.
+
+#### Based on EDA analysis, we are only going to consider "fixed.acidity", "volatile.acidity, "chlorides", "density", "alcohol"
+
+## Create Models
+
+Only the best fittest model has been selected for this project, while others have been tested and those are not included in this project. Considering the scope of this project, this model fits the best. Although the EDA process points the top 5 variables to be important for the quality prediction, we are going to work with the following linear model. 
+
+
+```{r warning=FALSE, message=FALSE}
+
+
+# Linear regression model using the minimum feature set
+model <- lm(quality ~ fixed.acidity+volatile.acidity+alcohol+chlorides+density, data = train_set)
+summary(model)
+# Evaluate the model's performance using the testing dataset
+predictions <- predict(model, test_set)
+mse <- mean((test_set$quality - predictions)^2)
+rSquared <- summary(model)$r.squared
+
+# Use the trained model to predict wine quality
+newData <- data.frame(fixed.acidity = 0.3, alcohol = 10, volatile.acidity = 0.5, chlorides = 0.7, density = 0.2)
+predictedQuality <- predict(model, newdata = newData)
+test_set$predicted <- ifelse(predict(model, test_set) > 6, "good", "bad")
+test_set$predicted <- as.factor(test_set$predicted)
+# Create a confusion matrix
+confMatrix <- table(test_set$predicted, test_set$quality_rating)
+
+confusionMatrix(test_set$predicted, test_set$quality_rating, positive = "good")
+print(confMatrix)
+```
+Although the R-squared value is not very significant, 3 stars with almost all variables is a good sign.
+The preceding confusion matrix seems sufficient enough for this exercise. We will discuss the performance of the model in the later section. 
+### This confusion matrix shows that the model correctly predicted 1172 bad wines and only 115 good wines, but misclassified 395 good wines as bad and 269 bad wines as good. This is good accuracy, perhaps the EDA could be improved to add more significant variables.  
+
+# Performance Using Confusion Matrix
+
+```{r message=FALSE, warning=FALSE}
+# Calculate accuracy
+accuracy <- sum(diag(confMatrix)) / sum(confMatrix)
+print(paste("Accuracy:", round(accuracy, 3)))
+
+# Calculate precision
+precision <- diag(confMatrix) / colSums(confMatrix)
+print(paste("Precision:", round(precision, 3)))
+
+# Calculate recall
+recall <- diag(confMatrix) / rowSums(confMatrix)
+print(paste("Recall:", round(recall, 3)))
+
+# Calculate F1-score
+f1_score <- 2 * precision * recall / (precision + recall)
+print(paste("F1-score:", round(f1_score, 3)))
+```
+
+# Prediction Function - Wine Quality: Sink or Glass
+
+```{r warning=FALSE, message=FALSE}
+# Define a function to predict wine quality
+predict_wine_quality <- function(fixed.acidity, volatile.acidity, alcohol, chlorides, density, threshold = 6) {
+
+  # Select the relevant features
+  features <- c("fixed.acidity", "volatile.acidity", "alcohol", "chlorides", "density", "quality")
+
+  # Fit a linear regression model
+  model <- lm(quality ~ fixed.acidity + volatile.acidity + alcohol + chlorides + density, data = train_set)
+
+  # Make a prediction for the given wine
+  prediction <- ifelse(predict(model, data.frame(fixed.acidity, volatile.acidity, alcohol, chlorides, density)) > threshold, "good", "bad")
+    # Print a message based on the predicted quality
+  if (prediction == "good") {
+    print("Pour in the glass!")
+  } else {
+    print("Drain it in the sink")
+  }
+  # Return the prediction
+  return(prediction)
+}
+# Check the function 
+prediction <- predict_wine_quality(fixed.acidity = 7.5, volatile.acidity = 0.6, alcohol = 12.5, chlorides = 0.08, density = 0.999)
+
+### You can test this for different values - play around with this function. 
+
+```
+
+You can use this function to evaluate your quality of wine with roughly 75% accuracy. Next time, you have these chemical characteristics you can decide whether this wine should be poured in the sink or into the glass
+
+# Process Elaboration
+
+After downloading and loading the datasets, I was certain about the initial steps; however, I was a bit reluctant with regards to the modelling part. I feel more comfortable with "R", henceforth, I tried all the EDA and other analysis procedures here. I used a simple technique to load and prepare the data initially. Later, the exploration part was great, as R studion gives you more options to play around with the visualization techniques. After the EDA, a few variables outperformed others; however, they did not make a fitting model to predict the quality of wine.
+
+From the beginning, the idea was to classify the wine as something to pour into the glass = 1 = good or into the sink = 0 = bad. Throughout the project, the idea remained firm and made a reasonable confusion matric at the end. 
+
+# Conclusion & Learnings
+
+In conclusion, the process of EDA has always amazed, as it is one of the most interesting step in data analysis. There are so many ways you can perform EDA. Making tables, visualization, and sometimes even both. The top 5 variables that outperformed other variables, include "fixed.acidity", "volatile.acidity, "chlorides", "density", "alcohol content". 
+
+Result from the model with minimum feature sets: 
+
+Residual standard error: 0.7485 on 4540 degrees of freedom
+Multiple R-squared:  0.2698,	Adjusted R-squared:  0.269 
+F-statistic: 335.5 on 5 and 4540 DF,  p-value: < 2.2e-16
+
+The performance of the model can be seen in the model section, where the summary of the model shows the r-squared value, important to evaluate the performance or the strength of the model. The confusion matrix turned out to be quit decent. The confusion matrix shows that the model correctly predicted 1172 bad wines and only 115 good wines, but misclassified 395 good wines as bad and 269 bad wines as good. This is good accuracy, perhaps the EDA could be improved to add more significant variables
+
+Performance of the best confusion matrix and the model is as follows:
+
+"Accuracy: 0.739"
+"Precision: 0.748"
+"Recall: 0.911"
+"F1-score: 0.821"
+
+I have learned so many important concepts and techniques through this project and through the whole course. The idea of creating and evaluating confusion matrix is extremely versatile and applicable everywhere. Also the feature classification and feature engineering are the two fundamental concepts that are the major takeaway from this exercise and from the course. I might have not labelled them in this project, but as you read through the codes and explanation, all the concepts are applied in this project. 
