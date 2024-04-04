@@ -24,27 +24,7 @@ The dataset contains two separate datasets for red and white wines, each with th
 ## Repository Structure
 
 - `data/`: Folder containing the raw dataset files.
-- `notebooks/`: Folder containing Jupyter notebooks for data exploration, preprocessing, model training, and evaluation.
-- `models/`: Folder containing saved trained machine learning models.
 - `README.md`: This file providing an overview of the project.
-
-## Getting Started
-
-To get started with this project, you can clone this repository and explore the Jupyter notebooks in the `notebooks/` directory. These notebooks provide step-by-step instructions for data exploration, preprocessing, model training, and evaluation.
-
-## Dependencies
-
-This project requires Python 3 and the following libraries:
-- NumPy
-- Pandas
-- Matplotlib
-- Seaborn
-- Scikit-learn
-
-You can install the dependencies using pip:
-
-`pip install numpy pandas matplotlib seaborn scikit-learn`
-
 
 ## License
 
